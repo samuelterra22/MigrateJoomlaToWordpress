@@ -1,21 +1,31 @@
-# http://python-wordpress-xmlrpc.readthedocs.io/en/latest/overview.html
+#!/usr/bin/python
 
-from wordpress_xmlrpc import Client, WordPressPost
-from wordpress_xmlrpc.methods.posts import GetPosts, NewPost
-from wordpress_xmlrpc.methods.users import GetUserInfo
+from Util.JoomlaUtil import JoomlaUtil
+from Util.WordpressUtil import WordpressUtil
 
-wp = Client('http://localhost/corrego/xmlrpc.php', 'admin', 'admin')
-wp.call(GetPosts())
-
-user_info = wp.call(GetUserInfo())
-
-print(user_info)
-
-post = WordPressPost()
-post.title = 'My new title'
-post.content = 'This is the body of my new post.'
-post.terms_names = {
-    'post_tag': ['test', 'firstpost'],
-    'category': ['Introductions', 'Tests']
+joomla_config = {
+    "db_joomla_host": "localhost",
+    "db_joomla_user": "root",
+    "db_joomla_pass": "",
+    "db_joomla_name": "corrego_teste",
 }
-# wp.call(NewPost(post))
+
+joomla_util = JoomlaUtil(config=joomla_config)
+
+# print(len(joomla_util.import_posts_k2()))
+# print(len(joomla_util.import_categories_k2()))
+# print(joomla_util.remove_all_posts())
+
+
+wp_config = {
+    "db_wp_host": "localhost",
+    "db_wp_user": "root",
+    "db_wp_pass": "",
+    "db_wp_name": "corrego_teste_wp",
+    "db_table_prefix": "wp_"
+}
+
+wp_util = WordpressUtil(config=wp_config)
+
+# print(wp_util.remove_all_posts())
+# print(wp_util.remove_all_categories())
