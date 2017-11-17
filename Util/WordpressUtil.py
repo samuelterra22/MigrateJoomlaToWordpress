@@ -1,7 +1,11 @@
 #  http://python-wordpress-xmlrpc.readthedocs.io/en/latest/overview.html
+# sudo python3.5 -m pip install mysqlclient
+
+
 from xmlrpc import client
 
 import MySQLdb
+from numpy.matlib import rand, random
 from wordpress_xmlrpc import xmlrpc_client, WordPressTerm
 from wordpress_xmlrpc.methods import media, taxonomies
 from wordpress_xmlrpc import Client, WordPressPost
@@ -99,22 +103,38 @@ class WordpressUtil(object):
         # }
         return response
 
-    def post_category(self, category):
+    def post_category(self, category_joomla, ref_cat):
         client = Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
+
+        idx = random.randint(0, 80)
 
         cat = WordPressTerm()
         cat.taxonomy = 'category'
-        cat.parent = 1  # id da categoria pai
-        cat.name = 'category bla'
+
+        if category_joomla.get_parent() != 0:
+            # id da categoria pai
+            cat.parent = ref_cat.get(category_joomla.get_parent())
+            parent = str(cat.parent)
+
+        cat.name = category_joomla.get_name()
+        cat.slug = str(idx) + str(cat.name)
         cat.id = client.call(taxonomies.NewTerm(cat))
 
-        return cat
+        print(cat.slug)
 
-    def post_categories(self, categories):
-        sorted_categories = sorted(categories, key=lambda category: category.get_parent())  # sort by parent
+        return cat.id
 
-        for category in categories:
-            self.post_category(category)
+    def post_categories(self, categories_joomla):
+
+        # sort by parent
+        sorted_categories_joomla = sorted(categories_joomla, key=lambda category: category.get_id())
+
+        ref_categories = {}
+
+        for category_joomla in sorted_categories_joomla:
+            new_id = self.post_category(category_joomla, ref_categories)
+            old_id = category_joomla.get_parent()
+            ref_categories.update({old_id: new_id})
 
     def post_to_wp(self, wp_post):
         client = Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
