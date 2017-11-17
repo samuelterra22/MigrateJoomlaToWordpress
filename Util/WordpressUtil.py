@@ -1,20 +1,29 @@
 #  http://python-wordpress-xmlrpc.readthedocs.io/en/latest/overview.html
+#
+# sudo python3.5 pip install python-wordpress-xmlrpc
 # sudo python3.5 -m pip install mysqlclient
+# sudo apt-get install libssl-dev python3-setuptools
+# sudo python3.5 -m pip install progressbar2
+#
+#
+#
+# Caso de erro de locals:
+# export LC_ALL="en_US.UTF-8"
+# export LC_CTYPE="en_US.UTF-8"
+# sudo dpkg-reconfigure locales
+#
 
-
-from xmlrpc import client
+import hashlib
+from io import BytesIO
 
 import MySQLdb
-from numpy.matlib import rand, random
+import progressbar
+import requests
+from numpy.matlib import random
+from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc import xmlrpc_client, WordPressTerm
 from wordpress_xmlrpc.methods import media, taxonomies
-from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods.posts import NewPost
-
-from PIL import Image
-import requests
-from io import BytesIO
-import time
 
 
 class WordpressUtil(object):
@@ -38,6 +47,8 @@ class WordpressUtil(object):
         )
 
     def remove_all_posts(self):
+        print("Apagando registros de posts...")
+
         db = self.get_connection()
 
         table = str(self._db_table_prefix) + "posts"
@@ -53,6 +64,8 @@ class WordpressUtil(object):
         return result
 
     def remove_all_categories(self):
+        print("Apagando registros de categorias...")
+
         db = self.get_connection()
         cur = db.cursor()
 
@@ -71,6 +84,8 @@ class WordpressUtil(object):
         return result
 
     def remove_all_post_tags(self):
+        print("Apagando registros de tags de posts...")
+
         db = self.get_connection()
 
         table = str(self._db_table_prefix) + "term_taxonomy"
@@ -87,18 +102,20 @@ class WordpressUtil(object):
     def get_client(self):
         return Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
 
-    def get_image_thumbnail(self):
-        pass
+    def get_name_thumbnail(self, post_id):
+        m = hashlib.md5()
+        img_name = "Image" + str(post_id)
+        m.update(img_name.encode('utf-8'))
+        return m.hexdigest()
 
     def post_thumbnail(self, post_id):
 
-        response = requests.get("http://corregofundo.mg.gov.br/media/k2/items/src/ab62275605c41a191b9e46f582304ada.jpg")
+        response = requests.get(
+            "http://corregofundo.mg.gov.br/media/k2/items/src/" + str(self.get_name_thumbnail(post_id)) + ".jpg")
+
         img = BytesIO(response.content)
 
         client = self.get_client()
-        # set to the path to your file
-        # filename = 'imagens/' + md5('Image' + id_post_joomla) + '.jpg'
-        filename = 'b414e2ba4719c9b4ceec2e3c09e2491b.jpg'
 
         # prepare metadata
         data = {
@@ -107,17 +124,8 @@ class WordpressUtil(object):
             'bits': xmlrpc_client.Binary(img.read())
         }
 
-        # read the binary file and let the XMLRPC library encode it into base64
-        # with open(filename, 'rb') as img:
-        #     data['bits'] = xmlrpc_client.Binary(img.read())
-
         response = client.call(media.UploadFile(data))
-        # response == {
-        #       'id': 6,
-        #       'file': 'picture.jpg'
-        #       'url': 'http://www.example.com/wp-content/uploads/2012/04/16/picture.jpg',
-        #       'type': 'image/jpeg',
-        # }
+
         return response
 
     def insert_category(self, category_joomla, ref_cat):
@@ -142,26 +150,23 @@ class WordpressUtil(object):
 
     def insert_categories(self, categories_joomla):
 
+        # se nao estiver na lixeira
+        categories_joomla = [category for category in categories_joomla if category.get_trash() != 1]
+
         num_categories = len(categories_joomla)
-        i = 1
 
         print("----------------------------------------------")
         print("Inserindo categorias no site em Wordpress...")
-        print("Total de categorias:\t" + str(num_categories))
+        print("Total de categorias:\t" + str(num_categories) + "\n")
 
         ref_categories = {}
 
-        # start_time = time.time()
-
+        bar = progressbar.ProgressBar()
         # Para todas as categorias do joomla
-        for category_joomla in categories_joomla:
-            print(str(round((i / num_categories) * 100, 1)) + "% concuido.")
-            # se nao estiver na lixeira
-            if category_joomla.get_trash() != 1:
-                new_id = self.insert_category(category_joomla, ref_categories)
-                old_id = category_joomla.get_id()
-                ref_categories.update({old_id: new_id})
-            i += 1
+        for category_joomla in bar(categories_joomla):
+            new_id = self.insert_category(category_joomla, ref_categories)
+            old_id = category_joomla.get_id()
+            ref_categories.update({old_id: new_id})
 
         return ref_categories
 
@@ -170,7 +175,11 @@ class WordpressUtil(object):
         client = self.get_client()
         post = WordPressPost()
         post.title = joomla_post.get_title()
-        post.content = joomla_post.get_introtext()
+
+        text_to_replace = joomla_post.get_introtext()
+
+        post.content = str(text_to_replace).replace("href=\"images/", "href=\"/images/")
+
         post.date = joomla_post.get_created()
 
         post.thumbnail = self.post_thumbnail(joomla_post.get_id())['id']
@@ -191,20 +200,20 @@ class WordpressUtil(object):
         posts_joomla = [post for post in posts_joomla if post.get_trash() != 1]
 
         num_posts = len(posts_joomla)
-        i = 1
-
         print("----------------------------------------------")
         print("Inserindo posts no site em Wordpress...")
-        print("Total de posts:\t" + str(num_posts))
+        print("Total de posts:\t" + str(num_posts) + "\n")
 
+        bar = progressbar.ProgressBar()
         # Para todas os posts do joomla
-        for post_joomla in posts_joomla:
-            print(str(round((i / num_posts) * 100, 1)) + "% concuido.")
+        for post_joomla in bar(posts_joomla):
+            # print(str(round((i / num_posts) * 100, 1)) + "% concuido.")
 
             # if post_joomla.get_trash() != 1:
             self.insert_post(post_joomla, ref_cat.get(post_joomla.get_catid()))
 
-            i += 1
-
         print("----------------------------------------------")
         # return ref_categories
+
+    def fix_links(self):
+        pass
