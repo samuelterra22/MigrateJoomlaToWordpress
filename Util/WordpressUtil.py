@@ -11,6 +11,11 @@ from wordpress_xmlrpc.methods import media, taxonomies
 from wordpress_xmlrpc import Client, WordPressPost
 from wordpress_xmlrpc.methods.posts import NewPost
 
+from PIL import Image
+import requests
+from io import BytesIO
+import time
+
 
 class WordpressUtil(object):
     def __init__(self, config):
@@ -79,7 +84,18 @@ class WordpressUtil(object):
 
         return result
 
-    def post_thumbnail(self, client):
+    def get_client(self):
+        return Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
+
+    def get_image_thumbnail(self):
+        pass
+
+    def post_thumbnail(self, post_id):
+
+        response = requests.get("http://corregofundo.mg.gov.br/media/k2/items/src/ab62275605c41a191b9e46f582304ada.jpg")
+        img = BytesIO(response.content)
+
+        client = self.get_client()
         # set to the path to your file
         # filename = 'imagens/' + md5('Image' + id_post_joomla) + '.jpg'
         filename = 'b414e2ba4719c9b4ceec2e3c09e2491b.jpg'
@@ -87,12 +103,13 @@ class WordpressUtil(object):
         # prepare metadata
         data = {
             'name': 'picture.jpg',
-            'type': 'image/jpeg',  # mimetype
+            'type': 'image/jpeg',
+            'bits': xmlrpc_client.Binary(img.read())
         }
 
         # read the binary file and let the XMLRPC library encode it into base64
-        with open(filename, 'rb') as img:
-            data['bits'] = xmlrpc_client.Binary(img.read())
+        # with open(filename, 'rb') as img:
+        #     data['bits'] = xmlrpc_client.Binary(img.read())
 
         response = client.call(media.UploadFile(data))
         # response == {
@@ -103,8 +120,8 @@ class WordpressUtil(object):
         # }
         return response
 
-    def post_category(self, category_joomla, ref_cat):
-        client = Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
+    def insert_category(self, category_joomla, ref_cat):
+        client = self.get_client()
 
         idx = random.randint(0, 80)
 
@@ -114,39 +131,80 @@ class WordpressUtil(object):
         if category_joomla.get_parent() != 0:
             # id da categoria pai
             cat.parent = ref_cat.get(category_joomla.get_parent())
-            parent = str(cat.parent)
 
         cat.name = category_joomla.get_name()
         cat.slug = str(idx) + str(cat.name)
         cat.id = client.call(taxonomies.NewTerm(cat))
 
-        print(cat.slug)
+        # print(cat.slug)
 
         return cat.id
 
-    def post_categories(self, categories_joomla):
+    def insert_categories(self, categories_joomla):
 
-        # sort by parent
-        sorted_categories_joomla = sorted(categories_joomla, key=lambda category: category.get_id())
+        num_categories = len(categories_joomla)
+        i = 1
+
+        print("----------------------------------------------")
+        print("Inserindo categorias no site em Wordpress...")
+        print("Total de categorias:\t" + str(num_categories))
 
         ref_categories = {}
 
-        for category_joomla in sorted_categories_joomla:
-            new_id = self.post_category(category_joomla, ref_categories)
-            old_id = category_joomla.get_parent()
-            ref_categories.update({old_id: new_id})
+        # start_time = time.time()
 
-    def post_to_wp(self, wp_post):
-        client = Client(str(self._site_url) + '/xmlrpc.php', self._site_username, self._site_password)
+        # Para todas as categorias do joomla
+        for category_joomla in categories_joomla:
+            print(str(round((i / num_categories) * 100, 1)) + "% concuido.")
+            # se nao estiver na lixeira
+            if category_joomla.get_trash() != 1:
+                new_id = self.insert_category(category_joomla, ref_categories)
+                old_id = category_joomla.get_id()
+                ref_categories.update({old_id: new_id})
+            i += 1
+
+        return ref_categories
+
+    def insert_post(self, joomla_post, category_id):
+
+        client = self.get_client()
         post = WordPressPost()
-        post.title = 'My new title'
-        post.content = 'This is the body of my new post.'
-        post.thumbnail = self.post_thumbnail(client)['id']
+        post.title = joomla_post.get_title()
+        post.content = joomla_post.get_introtext()
+        post.date = joomla_post.get_created()
+
+        post.thumbnail = self.post_thumbnail(joomla_post.get_id())['id']
+
         post.post_status = "publish"
-        post.terms_names = {
-            # 'post_tag': ['test', 'firstpost'],
-            'category': ['Introductions', 'Tests']
-        }
+
+        category = client.call(taxonomies.GetTerm('category', category_id))
+
+        post.terms.append(category)
+
         client.call(NewPost(post))
 
         return post
+
+    def insert_posts(self, posts_joomla, ref_cat):
+
+        # se nao estiver na lixeira
+        posts_joomla = [post for post in posts_joomla if post.get_trash() != 1]
+
+        num_posts = len(posts_joomla)
+        i = 1
+
+        print("----------------------------------------------")
+        print("Inserindo posts no site em Wordpress...")
+        print("Total de posts:\t" + str(num_posts))
+
+        # Para todas os posts do joomla
+        for post_joomla in posts_joomla:
+            print(str(round((i / num_posts) * 100, 1)) + "% concuido.")
+
+            # if post_joomla.get_trash() != 1:
+            self.insert_post(post_joomla, ref_cat.get(post_joomla.get_catid()))
+
+            i += 1
+
+        print("----------------------------------------------")
+        # return ref_categories
