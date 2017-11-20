@@ -119,6 +119,7 @@ class JoomlaUtil(object):
 
         result = cur.fetchall()
 
+        db.commit()
         db.close()
 
         return result

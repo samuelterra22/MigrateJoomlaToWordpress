@@ -129,8 +129,6 @@ class WordpressUtil(object):
         cat.slug = str(idx) + str(cat.name)
         cat.id = client.call(taxonomies.NewTerm(cat))
 
-        # print(cat.slug)
-
         return cat.id
 
     def insert_categories(self, categories_joomla):
@@ -163,7 +161,9 @@ class WordpressUtil(object):
 
         text_to_replace = joomla_post.get_introtext()
 
-        post.content = str(text_to_replace).replace("href=\"images/", "href=\"/images/")
+        text_to_replace = str(text_to_replace).replace("href=\"images/", "href=\"/images/")
+
+        post.content = str(text_to_replace).replace("src=\"images/", "src=\"/images/")
 
         post.date = joomla_post.get_created()
 
@@ -192,13 +192,7 @@ class WordpressUtil(object):
         bar = progressbar.ProgressBar()
         # Para todas os posts do joomla
         for post_joomla in bar(posts_joomla):
-            # print(str(round((i / num_posts) * 100, 1)) + "% concuido.")
-
-            # if post_joomla.get_trash() != 1:
             self.insert_post(post_joomla, ref_cat.get(post_joomla.get_catid()))
 
         print("----------------------------------------------")
         # return ref_categories
-
-    def fix_links(self):
-        pass
