@@ -3,14 +3,14 @@
 from Util.JoomlaUtil import JoomlaUtil
 from Util.WordpressUtil import WordpressUtil
 
-print("JOOMLA")
+print("\nJOOMLA")
 
 db_joomla_host = input("Joomla database host:")
 db_joomla_name = input("Joomla database name:")
 db_joomla_user = input("Joomla database user:")
 db_joomla_pass = input("Joomla database password:")
 
-print("WORDPRESS")
+print("WORDPRESS\n")
 
 db_wp_host = input("Wordpress database host:")
 db_wp_name = input("Wordpress database name:")
