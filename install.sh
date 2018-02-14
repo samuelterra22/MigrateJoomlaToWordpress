@@ -18,7 +18,7 @@ echo "###############################################################"
 sudo apt-get install python3-pip
 sudo python3.5 -m pip install --upgrade pip
 sudo apt-get install python3-mysqldb
-sudo python3.5 pip -m install python-wordpress-xmlrpc
+sudo python3.5 -m pip install python-wordpress-xmlrpc
 sudo python3.5 -m pip install mysqlclient
 sudo apt-get install -y libssl-dev python3-setuptools
 sudo python3.5 -m pip install progressbar2
